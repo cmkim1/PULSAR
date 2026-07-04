@@ -20,11 +20,13 @@ def require_executable(name: str) -> str:
     return path
 
 
-def run_command(command: list[str], log_path: Path, allow_outputs: list[Path] | None = None) -> None:
+def run_command(command: list[str], log_path: Path, allow_outputs: list[Path] | None = None, cwd: Path | None = None) -> None:
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with log_path.open("w") as log:
         log.write("$ " + " ".join(command) + "\n\n")
-        proc = subprocess.run(command, stdout=log, stderr=subprocess.STDOUT, text=True)
+        if cwd is not None:
+            log.write(f"# cwd: {cwd}\n\n")
+        proc = subprocess.run(command, stdout=log, stderr=subprocess.STDOUT, text=True, cwd=cwd)
     if proc.returncode != 0:
         if allow_outputs and any(path.exists() and path.stat().st_size > 0 for path in allow_outputs):
             with log_path.open("a") as log:
@@ -124,10 +126,18 @@ def run_dbcan(
     dbcan_file: str | None = None,
     cpus: int = 4,
 ) -> Path:
+    faa = faa.resolve()
+    out_dir = out_dir.resolve()
+    db_dir = db_dir.resolve()
+    gff = gff.resolve() if gff is not None else None
+
     dbcan_out = out_dir / "dbcan"
     log = out_dir / "logs" / "run_dbcan.log"
+    command_cwd = None
     if run_dbcan_script is not None:
+        run_dbcan_script = run_dbcan_script.resolve()
         command = [sys.executable, str(run_dbcan_script)]
+        command_cwd = run_dbcan_script.parent
     else:
         run_dbcan_exec = require_executable(run_dbcan_bin)
         command = [run_dbcan_exec]
@@ -153,7 +163,8 @@ def run_dbcan(
         command.extend(["--dbCANFile", dbcan_file])
     if gff is not None:
         command.extend(["--cluster", str(gff)])
-    run_command(command, log, allow_outputs=[dbcan_out / "cgc.out", dbcan_out / "hmmer.out", dbcan_out / "diamond.out"])
+    allow_outputs = [dbcan_out / "cgc.out"] if gff is not None else [dbcan_out / "hmmer.out", dbcan_out / "diamond.out"]
+    run_command(command, log, allow_outputs=allow_outputs, cwd=command_cwd)
     return dbcan_out
 
 

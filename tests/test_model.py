@@ -1,6 +1,6 @@
 import pandas as pd
 
-from agarase_score.model import score_dataframe
+from pulsar_agarase.model import score_dataframe
 
 
 def test_unresolved_core_openers_are_not_ranked():

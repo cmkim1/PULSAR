@@ -1,4 +1,4 @@
-"""Command-line interface for agarase-score."""
+"""Command-line interface for PULSAR."""
 
 from __future__ import annotations
 
@@ -62,8 +62,8 @@ def setup_dbcan(args: argparse.Namespace) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="agarase-score",
-        description="Score agarolytic PUL architecture and recommend candidate GH families.",
+        prog="pulsar",
+        description="PULSAR: PUL-based Selection of AgaRase.",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 

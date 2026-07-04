@@ -1,4 +1,4 @@
-name: agarase-score
+name: pulsar
 channels:
   - conda-forge
   - bioconda

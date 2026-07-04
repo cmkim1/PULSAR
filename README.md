@@ -1,7 +1,7 @@
-# agarase-score
+# PULSAR
 
-`agarase-score` is a small command-line tool for architecture-based scoring of
-agarolytic PULs and candidate GH family additions.
+PULSAR (PUL-based Selection of AgaRase) is a small command-line tool for
+architecture-based scoring of agarolytic PULs and candidate GH family additions.
 
 The model is intentionally rule-based and interpretable. It uses the local PUL
 architecture around agarolytic pathway genes rather than experimental outcomes.
@@ -33,18 +33,18 @@ Key interpretation rules:
 Install the external annotation tools first. With conda/mamba:
 
 ```bash
-git clone https://github.com/YOUR_USER/agarase-score.git
-cd agarase-score
+git clone https://github.com/YOUR_USER/PULSAR.git
+cd PULSAR
 mamba env create -f environment.yml
-mamba activate agarase-score
+mamba activate pulsar
 ```
 
 If you already have Prodigal and dbCAN installed, a lightweight editable install
 is enough:
 
 ```bash
-git clone https://github.com/YOUR_USER/agarase-score.git
-cd agarase-score
+git clone https://github.com/YOUR_USER/PULSAR.git
+cd PULSAR
 python3 -m pip install -e .
 ```
 
@@ -53,14 +53,14 @@ Check commands:
 ```bash
 prodigal -v
 run_dbcan --help
-agarase-score --help
+pulsar --help
 ```
 
 Prepare the dbCAN database once, or let `run-genome` do this automatically
 when the database directory is empty:
 
 ```bash
-agarase-score setup-dbcan \
+pulsar setup-dbcan \
   --db-dir dbcan_db \
   --min-free-gb 20
 ```
@@ -69,12 +69,12 @@ agarase-score setup-dbcan \
 
 ### 1. Start from a genome FASTA
 
-If the input is nucleotide FASTA (`.fna`, `.fa`, `.fasta`), `agarase-score`
+If the input is nucleotide FASTA (`.fna`, `.fa`, `.fasta`), PULSAR
 runs Prodigal first, then runs dbCAN/CGCFinder, extracts features, and scores
 the genome:
 
 ```bash
-agarase-score run-genome \
+pulsar run-genome \
   --genome genome.fna \
   --out-dir output/GenomeA \
   --dbcan-db dbcan_db \
@@ -107,7 +107,7 @@ If the input is already a protein FASTA (`.faa`), provide a matching GFF if
 CGCFinder clustering is desired:
 
 ```bash
-agarase-score run-genome \
+pulsar run-genome \
   --genome proteins.faa \
   --input-type faa \
   --gff genes.gff \
@@ -119,12 +119,12 @@ External programs required for this command:
 
 - `prodigal` for nucleotide genome input
 - `run_dbcan`
-- a prepared dbCAN database from `agarase-score setup-dbcan`
+- a prepared dbCAN database from `pulsar setup-dbcan`
 
 ### 2. Score an existing feature table
 
 ```bash
-agarase-score score-table \
+pulsar score-table \
   --input examples/example_features.tsv \
   --output output/example_predictions.tsv \
   --summary output/example_summary.tsv
@@ -147,11 +147,11 @@ dbcan_outputs/
 Then run:
 
 ```bash
-agarase-score features-from-dbcan \
+pulsar features-from-dbcan \
   --dbcan-dir dbcan_outputs \
   --output output/features.tsv
 
-agarase-score score-table \
+pulsar score-table \
   --input output/features.tsv \
   --output output/predictions.tsv
 ```
@@ -159,7 +159,7 @@ agarase-score score-table \
 Optional metadata:
 
 ```bash
-agarase-score features-from-dbcan \
+pulsar features-from-dbcan \
   --dbcan-dir dbcan_outputs \
   --metadata metadata.tsv \
   --output output/features.tsv

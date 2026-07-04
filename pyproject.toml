@@ -3,9 +3,9 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "agarase-score"
+name = "pulsar-agarase"
 version = "0.1.0"
-description = "Architecture-based scoring of agarolytic PULs and candidate agarase supplementation targets."
+description = "PULSAR: PUL-based Selection of AgaRase."
 readme = "README.md"
 requires-python = ">=3.9"
 license = {text = "MIT"}
@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.scripts]
-agarase-score = "agarase_score.cli:main"
+pulsar = "pulsar_agarase.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

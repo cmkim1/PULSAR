@@ -1,4 +1,4 @@
-"""Architecture-based agarase/PUL scoring model."""
+"""PULSAR architecture-based agarase/PUL scoring model."""
 
 from __future__ import annotations
 

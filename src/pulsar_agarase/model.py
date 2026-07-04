@@ -58,7 +58,11 @@ def score_row(row: pd.Series) -> dict[str, Any]:
             "core_opener_status": "not_detected",
         }
 
-    strict = _counts(row, "strict_n")
+    context_prefix = "strict_n" if strict_loci > 0 else "broad_locus_n"
+    locus_count = strict_loci if strict_loci > 0 else broad_loci
+    context_label = "strict PUL" if strict_loci > 0 else "broad locus"
+
+    strict = _counts(row, context_prefix)
     genome = _counts(row, "genome_n")
     outside = _counts(row, "outside_strict_n")
 
@@ -67,9 +71,9 @@ def score_row(row: pd.Series) -> dict[str, Any]:
     strict_aux_openers = sum(strict[family] for family in AUX_OPENERS)
     central = strict["GH117"] > 0
 
-    central_status = "GH117_positive_central_PUL" if central else "no_GH117_positive_central_PUL"
+    central_status = f"GH117_positive_{context_label.replace(' ', '_')}" if central else f"no_GH117_positive_{context_label.replace(' ', '_')}"
     if not central and (strict_core_openers + strict["GH50"] + strict_aux_openers) > 0:
-        _add(scores, reasons, "GH117", 4.0, "GH117-positive central PUL is absent from agar-PUL context")
+        _add(scores, reasons, "GH117", 4.0, f"GH117-positive central context is absent from {context_label}")
 
     if strict_core_openers > 0 and strict["GH50"] > 0 and strict["GH117"] > 0:
         core_status = "complete_detected_core"
@@ -90,7 +94,7 @@ def score_row(row: pd.Series) -> dict[str, Any]:
                     reasons,
                     family,
                     3.0,
-                    "GH117/GH50 core context lacks any detected GH16/GH86/GH118 core opener",
+                    f"GH117/GH50 {context_label} lacks any detected GH16/GH86/GH118 core opener",
                 )
             core_opener_status = "unresolved_core_opener_missing"
         else:
@@ -102,7 +106,7 @@ def score_row(row: pd.Series) -> dict[str, Any]:
                         reasons,
                         family,
                         3.0,
-                        f"{family} is present outside strict PULs but absent from the GH117-centered PUL",
+                        f"{family} is present genome-wide but absent from the GH117-centered {context_label}",
                     )
                     candidates.append(family)
             core_opener_status = "outside_core_opener_candidate" if candidates else "strict_core_opener_gap"
@@ -115,7 +119,7 @@ def score_row(row: pd.Series) -> dict[str, Any]:
                     reasons,
                     family,
                     3.0,
-                    f"{family} is present outside strict PULs but absent from the GH117-centered PUL",
+                    f"{family} is present genome-wide but absent from the GH117-centered {context_label}",
                 )
                 candidates.append(family)
         core_opener_status = "outside_core_opener_candidate" if candidates else "strict_core_opener_present"
@@ -123,28 +127,28 @@ def score_row(row: pd.Series) -> dict[str, Any]:
         core_opener_status = "not_GH117_GH50_core_context"
 
     if strict["GH50"] == 0 and strict["GH117"] > 0 and genome_core_openers > 0:
-        _add(scores, reasons, "GH50", 3.5, "Core pathway has GH16/GH86/GH118 context and GH117 but lacks strict-PUL GH50")
+        _add(scores, reasons, "GH50", 3.5, f"Core pathway has GH16/GH86/GH118 context and GH117 but lacks {context_label} GH50")
 
     terminal_substrate_context = strict["GH50"] + strict["GH2"]
     if broad_loci >= 3 and strict["GH117"] <= 2 and terminal_substrate_context >= 6:
-        _add(scores, reasons, "GH117", 3.0, "GH117 is limited relative to strict-PUL GH50/GH2 terminal-substrate context")
-    elif strict["GH117"] == 1 and strict_loci >= 2:
-        _add(scores, reasons, "GH117", 1.5, "GH117 is single-copy across multiple strict agar loci")
+        _add(scores, reasons, "GH117", 3.0, f"GH117 is limited relative to {context_label} GH50/GH2 terminal-substrate context")
+    elif strict["GH117"] == 1 and locus_count >= 2:
+        _add(scores, reasons, "GH117", 1.5, f"GH117 is single-copy across multiple {context_label}s")
 
     if strict_aux_openers > 0 and strict["GH117"] > 0:
         aux_status = "complete_or_overlapping_auxiliary"
     elif strict_aux_openers > 0:
         aux_status = "auxiliary_missing_GH117"
-        _add(scores, reasons, "GH117", 3.0, "auxiliary GH96/GH2 context lacks GH117 in strict PULs")
+        _add(scores, reasons, "GH117", 3.0, f"auxiliary GH96/GH2 context lacks GH117 in {context_label}")
     elif strict["GH117"] > 0:
-        aux_status = "auxiliary_openers_outside_strict_PUL"
+        aux_status = f"auxiliary_openers_outside_{context_label.replace(' ', '_')}"
     else:
         aux_status = "not_detected"
 
     if strict["GH96"] == 0 and strict["GH2"] > 0 and strict["GH117"] > 0:
-        _add(scores, reasons, "GH96", 1.5, "auxiliary pathway has GH2/GH117 but no strict-PUL GH96")
+        _add(scores, reasons, "GH96", 1.5, f"auxiliary pathway has GH2/GH117 but no {context_label} GH96")
     if strict["GH2"] == 0 and strict["GH96"] > 0 and strict["GH117"] > 0:
-        _add(scores, reasons, "GH2", 1.0, "auxiliary pathway has GH96/GH117 but no strict-PUL GH2")
+        _add(scores, reasons, "GH2", 1.0, f"auxiliary pathway has GH96/GH117 but no {context_label} GH2")
 
     threshold = 3.0
     recommended = [family for family in FAMILIES if scores[family] >= threshold]

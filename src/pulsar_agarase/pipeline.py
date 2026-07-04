@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pandas as pd
@@ -19,12 +20,19 @@ def require_executable(name: str) -> str:
     return path
 
 
-def run_command(command: list[str], log_path: Path) -> None:
+def run_command(command: list[str], log_path: Path, allow_outputs: list[Path] | None = None) -> None:
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with log_path.open("w") as log:
         log.write("$ " + " ".join(command) + "\n\n")
         proc = subprocess.run(command, stdout=log, stderr=subprocess.STDOUT, text=True)
     if proc.returncode != 0:
+        if allow_outputs and any(path.exists() and path.stat().st_size > 0 for path in allow_outputs):
+            with log_path.open("a") as log:
+                log.write(
+                    f"\nPULSAR warning: command exited with {proc.returncode}, "
+                    "but expected dbCAN output files were created; continuing.\n"
+                )
+            return
         raise RuntimeError(f"Command failed with exit code {proc.returncode}. See log: {log_path}")
 
 
@@ -105,33 +113,39 @@ def run_dbcan(
     db_dir: Path,
     gff: Path | None,
     run_dbcan_bin: str = "run_dbcan",
+    run_dbcan_script: Path | None = None,
     tools: str = "hmmer,diamond",
     dbcan_file: str | None = None,
     cpus: int = 4,
 ) -> Path:
-    run_dbcan_exec = require_executable(run_dbcan_bin)
     dbcan_out = out_dir / "dbcan"
     log = out_dir / "logs" / "run_dbcan.log"
-    command = [
-        run_dbcan_exec,
-        str(faa),
-        "protein",
-        "--out_dir",
-        str(dbcan_out),
-        "--db_dir",
-        str(db_dir),
-        "--tools",
-        tools,
-        "--hmm_cpu",
-        str(cpus),
-        "--dia_cpu",
-        str(cpus),
-    ]
+    if run_dbcan_script is not None:
+        command = [sys.executable, str(run_dbcan_script)]
+    else:
+        run_dbcan_exec = require_executable(run_dbcan_bin)
+        command = [run_dbcan_exec]
+    command.extend(
+        [
+            str(faa),
+            "protein",
+            "--out_dir",
+            str(dbcan_out),
+            "--db_dir",
+            str(db_dir),
+            "--tools",
+            tools,
+            "--hmm_cpu",
+            str(cpus),
+            "--dia_cpu",
+            str(cpus),
+        ]
+    )
     if dbcan_file:
         command.extend(["--dbCANFile", dbcan_file])
     if gff is not None:
         command.extend(["--cluster", str(gff)])
-    run_command(command, log)
+    run_command(command, log, allow_outputs=[dbcan_out / "cgc.out", dbcan_out / "hmmer.out", dbcan_out / "diamond.out"])
     return dbcan_out
 
 
@@ -145,6 +159,7 @@ def score_genome(
     taxname: str | None = None,
     prodigal_bin: str = "prodigal",
     run_dbcan_bin: str = "run_dbcan",
+    run_dbcan_script: Path | None = None,
     tools: str = "hmmer,diamond",
     dbcan_file: str | None = None,
     cpus: int = 4,
@@ -179,6 +194,7 @@ def score_genome(
         db_dir=dbcan_db,
         gff=cluster_gff,
         run_dbcan_bin=run_dbcan_bin,
+        run_dbcan_script=run_dbcan_script,
         tools=tools,
         dbcan_file=dbcan_file,
         cpus=cpus,

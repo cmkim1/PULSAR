@@ -42,6 +42,7 @@ def run_genome(args: argparse.Namespace) -> None:
         taxname=args.taxname,
         prodigal_bin=args.prodigal_bin,
         run_dbcan_bin=args.run_dbcan_bin,
+        run_dbcan_script=Path(args.run_dbcan_script) if args.run_dbcan_script else None,
         tools=args.tools,
         dbcan_file=args.dbcan_file,
         cpus=args.cpus,
@@ -96,6 +97,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_run.add_argument("--taxname", help="Taxon/strain name to write in the output table.")
     p_run.add_argument("--prodigal-bin", default="prodigal", help="Prodigal executable name or path.")
     p_run.add_argument("--run-dbcan-bin", default="run_dbcan", help="run_dbcan executable name or path.")
+    p_run.add_argument("--run-dbcan-script", help="Legacy run_dbcan.py script path. If set, PULSAR calls it with the current Python interpreter.")
     p_run.add_argument("--tools", default="hmmer,diamond", help="dbCAN tools argument. Default: hmmer,diamond.")
     p_run.add_argument("--dbcan-file", help="Optional dbCAN HMM database filename, e.g. dbCAN-HMMdb-V9.txt.")
     p_run.add_argument("--cpus", type=int, default=4, help="CPU threads for HMMER/DIAMOND. Default: 4.")

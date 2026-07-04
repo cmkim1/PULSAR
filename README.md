@@ -115,6 +115,18 @@ pulsar run-genome \
   --dbcan-db /path/to/dbcan_db
 ```
 
+Legacy `run_dbcan.py` installations can be used directly:
+
+```bash
+pulsar run-genome \
+  --genome genome.fna \
+  --out-dir output/GenomeA \
+  --dbcan-db /path/to/dbcan_db \
+  --run-dbcan-script /path/to/run_dbcan.py \
+  --dbcan-file dbCAN-HMMdb-V9.txt \
+  --skip-dbcan-setup
+```
+
 External programs required for this command:
 
 - `prodigal` for nucleotide genome input

@@ -66,3 +66,26 @@ def test_broad_locus_context_is_scored_when_strict_cgc_is_empty():
 
     assert scored.loc[0, "recommended_GH_group"] == "GH16+GH86+GH118"
     assert scored.loc[0, "central_pul_status"] == "GH117_positive_broad_locus"
+
+
+def test_genome_wide_agarase_hits_without_locus_context_are_reported():
+    row = {
+        "genome": "g1",
+        "taxname": "Example",
+        "strict_n_agar_loci": 0,
+        "broad_n_agar_loci": 0,
+        "has_genome_wide_annotation": 1,
+    }
+    for family in ["GH2", "GH16", "GH50", "GH86", "GH96", "GH117", "GH118"]:
+        row[f"strict_n_{family}"] = 0
+        row[f"genome_n_{family}"] = 0
+        row[f"broad_locus_n_{family}"] = 0
+        row[f"outside_strict_n_{family}"] = 0
+    row["genome_n_GH16"] = 8
+    row["genome_n_GH50"] = 2
+    row["genome_n_GH117"] = 1
+
+    scored = score_dataframe(pd.DataFrame([row]))
+
+    assert scored.loc[0, "prediction_class"] == "genome_wide_agarase_without_locus_context"
+    assert scored.loc[0, "recommended_GH_group"] == "none_locus_context_required"

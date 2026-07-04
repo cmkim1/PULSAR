@@ -43,8 +43,24 @@ def score_row(row: pd.Series) -> dict[str, Any]:
     strict_loci = int(_val(row, "strict_n_agar_loci"))
     broad_loci = int(_val(row, "broad_n_agar_loci", strict_loci))
     has_global = int(_val(row, "has_genome_wide_annotation"))
+    genome = _counts(row, "genome_n")
 
     if strict_loci == 0 and broad_loci == 0:
+        genome_hits = {family: count for family, count in genome.items() if count > 0}
+        if genome_hits:
+            hit_text = ", ".join(f"{family}={count}" for family, count in genome_hits.items())
+            return {
+                **{f"{family}_score": 0.0 for family in FAMILIES},
+                "recommended_GH_group": "none_locus_context_required",
+                "top_recommended_GH": "none",
+                "prediction_class": "genome_wide_agarase_without_locus_context",
+                "model_confidence": "low",
+                "model_rationale": f"Genome-wide agarase-family hits were detected ({hit_text}), but no strict CGC/PUL or broad colocalized agar locus was detected; PULSAR does not recommend additions without locus context.",
+                "central_pul_status": "no_locus_context",
+                "core_pathway_status": "genome_wide_only",
+                "auxiliary_pathway_status": "genome_wide_only",
+                "core_opener_status": "genome_wide_only",
+            }
         return {
             **{f"{family}_score": 0.0 for family in FAMILIES},
             "recommended_GH_group": "none",
@@ -63,7 +79,6 @@ def score_row(row: pd.Series) -> dict[str, Any]:
     context_label = "strict PUL" if strict_loci > 0 else "broad locus"
 
     strict = _counts(row, context_prefix)
-    genome = _counts(row, "genome_n")
     outside = _counts(row, "outside_strict_n")
 
     strict_core_openers = sum(strict[family] for family in CORE_OPENERS)

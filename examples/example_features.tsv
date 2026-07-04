@@ -1,0 +1,4 @@
+genome	taxname	strict_n_agar_loci	broad_n_agar_loci	has_genome_wide_annotation	strict_n_GH2	genome_n_GH2	broad_locus_n_GH2	outside_strict_n_GH2	strict_n_GH16	genome_n_GH16	broad_locus_n_GH16	outside_strict_n_GH16	strict_n_GH50	genome_n_GH50	broad_locus_n_GH50	outside_strict_n_GH50	strict_n_GH86	genome_n_GH86	broad_locus_n_GH86	outside_strict_n_GH86	strict_n_GH96	genome_n_GH96	broad_locus_n_GH96	outside_strict_n_GH96	strict_n_GH117	genome_n_GH117	broad_locus_n_GH117	outside_strict_n_GH117	strict_n_GH118	genome_n_GH118	broad_locus_n_GH118	outside_strict_n_GH118
+Example_complete_core	Example complete-core bacterium	1	1	1	1	1	1	0	1	1	1	0	2	2	2	0	1	1	1	0	0	0	0	0	1	1	1	0	0	0	0	0
+Example_split_core	Example split-core bacterium	2	3	1	2	2	2	0	1	3	1	2	3	3	3	0	0	2	0	2	0	0	0	0	1	2	1	1	0	0	0	0
+Example_missing_core_openers	Example missing-core-opener bacterium	1	1	1	1	1	1	0	0	0	0	0	3	3	3	0	0	0	0	0	0	0	0	0	1	1	1	0	0	0	0	0

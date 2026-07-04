@@ -1,0 +1,15 @@
+.DS_Store
+__pycache__/
+*.pyc
+*.egg-info/
+src/*.egg-info/
+.pytest_cache/
+.venv/
+dist/
+build/
+*.egg-info/
+input/
+output/
+visualization/
+*.tar.gz
+*.zip

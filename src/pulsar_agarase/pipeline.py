@@ -107,6 +107,12 @@ def run_prodigal(fna: Path, work_dir: Path, prodigal_bin: str = "prodigal") -> t
     return faa, gff
 
 
+def dbcan_tools_args(tools: str, legacy_script: bool = False) -> list[str]:
+    if not legacy_script:
+        return [tools]
+    return [tool.strip() for tool in tools.replace(",", " ").split() if tool.strip()]
+
+
 def run_dbcan(
     faa: Path,
     out_dir: Path,
@@ -134,7 +140,9 @@ def run_dbcan(
             "--db_dir",
             str(db_dir),
             "--tools",
-            tools,
+        ]
+        + dbcan_tools_args(tools, legacy_script=run_dbcan_script is not None)
+        + [
             "--hmm_cpu",
             str(cpus),
             "--dia_cpu",

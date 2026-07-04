@@ -20,8 +20,16 @@ def require_executable(name: str) -> str:
     return path
 
 
-def run_command(command: list[str], log_path: Path, allow_outputs: list[Path] | None = None, cwd: Path | None = None) -> None:
+def run_command(
+    command: list[str],
+    log_path: Path,
+    allow_outputs: list[Path] | None = None,
+    cwd: Path | None = None,
+    label: str | None = None,
+) -> None:
     log_path.parent.mkdir(parents=True, exist_ok=True)
+    if label:
+        print(f"PULSAR: starting {label}; log={log_path}", flush=True)
     with log_path.open("w") as log:
         log.write("$ " + " ".join(command) + "\n\n")
         if cwd is not None:
@@ -36,6 +44,8 @@ def run_command(command: list[str], log_path: Path, allow_outputs: list[Path] | 
                 )
             return
         raise RuntimeError(f"Command failed with exit code {proc.returncode}. See log: {log_path}")
+    if label:
+        print(f"PULSAR: finished {label}", flush=True)
 
 
 def free_gb(path: Path) -> float:
@@ -105,8 +115,27 @@ def run_prodigal(fna: Path, work_dir: Path, prodigal_bin: str = "prodigal") -> t
         "-p",
         "single",
     ]
-    run_command(command, log)
+    run_command(command, log, label="Prodigal gene prediction")
     return faa, gff
+
+
+def sanitize_gff_for_dbcan(gff: Path, destination: Path) -> Path:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with gff.open() as source, destination.open("w") as sink:
+        for line in source:
+            if line.startswith("#") or not line.strip():
+                sink.write(line)
+                continue
+            parts = line.rstrip("\n").split("\t")
+            if len(parts) < 9:
+                sink.write(line)
+                continue
+            attrs = [item.strip() for item in parts[8].split(";") if item.strip() and "=" in item]
+            if not attrs:
+                attrs = [f"ID={parts[0]}_{parts[3]}_{parts[4]}"]
+            parts[8] = ";".join(attrs)
+            sink.write("\t".join(parts) + "\n")
+    return destination
 
 
 def dbcan_tools_args(tools: str, legacy_script: bool = False) -> list[str]:
@@ -133,6 +162,9 @@ def run_dbcan(
 
     dbcan_out = out_dir / "dbcan"
     log = out_dir / "logs" / "run_dbcan.log"
+    if gff is not None:
+        gff = sanitize_gff_for_dbcan(gff, out_dir / "work" / "dbcan_cluster.gff")
+
     command_cwd = None
     if run_dbcan_script is not None:
         run_dbcan_script = run_dbcan_script.resolve()
@@ -163,8 +195,8 @@ def run_dbcan(
         command.extend(["--dbCANFile", dbcan_file])
     if gff is not None:
         command.extend(["--cluster", str(gff)])
-    allow_outputs = [dbcan_out / "cgc.out"] if gff is not None else [dbcan_out / "hmmer.out", dbcan_out / "diamond.out"]
-    run_command(command, log, allow_outputs=allow_outputs, cwd=command_cwd)
+    allow_outputs = [dbcan_out / "cgc.out", dbcan_out / "cgc.gff"] if gff is not None else [dbcan_out / "hmmer.out", dbcan_out / "diamond.out"]
+    run_command(command, log, allow_outputs=allow_outputs, cwd=command_cwd, label="dbCAN/CGCFinder")
     return dbcan_out
 
 
@@ -188,6 +220,7 @@ def score_genome(
     out_dir.mkdir(parents=True, exist_ok=True)
     work_dir = out_dir / "work"
     work_dir.mkdir(parents=True, exist_ok=True)
+    print(f"PULSAR: output directory={out_dir}", flush=True)
 
     kind = detect_input_type(genome, input_type)
     if kind == "fna":
@@ -223,4 +256,5 @@ def score_genome(
     scored = score_dataframe(features)
     features.to_csv(out_dir / "features.tsv", sep="\t", index=False)
     scored.to_csv(out_dir / "predictions.tsv", sep="\t", index=False)
+    print(f"PULSAR: wrote {out_dir / 'predictions.tsv'}", flush=True)
     return scored

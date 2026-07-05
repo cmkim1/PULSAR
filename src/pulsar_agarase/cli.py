@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import argparse
+import shutil
 from pathlib import Path
 
 import pandas as pd
 
-from .features import features_from_dbcan_root
+from .features import features_from_dbcan_dir, features_from_dbcan_root
 from .model import score_dataframe
-from .pipeline import score_genome, setup_dbcan_database
+from .pipeline import dbcan_database_present, score_genome, setup_dbcan_database
 
 
 def score_table(args: argparse.Namespace) -> None:
@@ -29,6 +30,17 @@ def score_table(args: argparse.Namespace) -> None:
 def features_from_dbcan(args: argparse.Namespace) -> None:
     features = features_from_dbcan_root(Path(args.dbcan_dir), Path(args.metadata) if args.metadata else None)
     features.to_csv(args.output, sep="\t", index=False)
+
+
+def score_dbcan(args: argparse.Namespace) -> None:
+    row = features_from_dbcan_dir(Path(args.dbcan_dir), genome=args.genome_id, taxname=args.taxname)
+    features = pd.DataFrame([row])
+    scored = score_dataframe(features)
+    if args.features_output:
+        features.to_csv(args.features_output, sep="\t", index=False)
+    scored.to_csv(args.output, sep="\t", index=False)
+    if args.print_summary:
+        print(scored.T.to_string())
 
 
 def run_genome(args: argparse.Namespace) -> None:
@@ -61,6 +73,38 @@ def setup_dbcan(args: argparse.Namespace) -> None:
     print(f"dbCAN database is ready: {db_dir}")
 
 
+def doctor(args: argparse.Namespace) -> None:
+    checks = []
+
+    def add_check(name: str, ok: bool, detail: str) -> None:
+        checks.append(ok)
+        status = "OK" if ok else "MISSING"
+        print(f"{status}\t{name}\t{detail}")
+
+    prodigal = shutil.which(args.prodigal_bin)
+    add_check("prodigal", prodigal is not None, prodigal or args.prodigal_bin)
+
+    if args.run_dbcan_script:
+        script = Path(args.run_dbcan_script)
+        add_check("legacy run_dbcan.py", script.is_file(), str(script))
+        helper = script.parent / "hmmscan-parser.py"
+        add_check("legacy hmmscan-parser.py", helper.is_file(), str(helper))
+    else:
+        run_dbcan = shutil.which(args.run_dbcan_bin)
+        add_check("run_dbcan", run_dbcan is not None, run_dbcan or args.run_dbcan_bin)
+
+    for executable in ["diamond", "hmmscan"]:
+        path = shutil.which(executable)
+        add_check(executable, path is not None, path or executable)
+
+    if args.dbcan_db:
+        db_dir = Path(args.dbcan_db)
+        add_check("dbCAN database", dbcan_database_present(db_dir), str(db_dir))
+
+    if not all(checks):
+        raise SystemExit(1)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="pulsar",
@@ -79,6 +123,15 @@ def build_parser() -> argparse.ArgumentParser:
     p_features.add_argument("-o", "--output", required=True, help="Output feature table TSV.")
     p_features.add_argument("--metadata", help="Optional TSV with genome and taxname columns.")
     p_features.set_defaults(func=features_from_dbcan)
+
+    p_score_dbcan = sub.add_parser("score-dbcan", help="Score one existing dbCAN output directory.")
+    p_score_dbcan.add_argument("--dbcan-dir", required=True, help="Directory containing cgc.out/hmmer.out/diamond.out/cgc.gff for one genome.")
+    p_score_dbcan.add_argument("-o", "--output", required=True, help="Output scored prediction TSV.")
+    p_score_dbcan.add_argument("--features-output", help="Optional output feature TSV.")
+    p_score_dbcan.add_argument("--genome-id", help="Genome ID to write in the output table.")
+    p_score_dbcan.add_argument("--taxname", help="Taxon/strain name to write in the output table.")
+    p_score_dbcan.add_argument("--print-summary", action="store_true", help="Print the scored row transposed to stdout.")
+    p_score_dbcan.set_defaults(func=score_dbcan)
 
     p_setup = sub.add_parser("setup-dbcan", help="Download/prepare the dbCAN database using run_dbcan.")
     p_setup.add_argument("--db-dir", required=True, help="Directory where dbCAN database files will be stored.")
@@ -104,6 +157,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_run.add_argument("--min-free-gb", type=float, default=20.0, help="Minimum free disk space before automatic dbCAN setup. Default: 20.")
     p_run.add_argument("--skip-dbcan-setup", action="store_true", help="Do not automatically run run_dbcan database if --dbcan-db is missing.")
     p_run.set_defaults(func=run_genome)
+
+    p_doctor = sub.add_parser("doctor", help="Check whether required external tools and optional dbCAN database are available.")
+    p_doctor.add_argument("--prodigal-bin", default="prodigal", help="Prodigal executable name or path.")
+    p_doctor.add_argument("--run-dbcan-bin", default="run_dbcan", help="run_dbcan executable name or path.")
+    p_doctor.add_argument("--run-dbcan-script", help="Legacy run_dbcan.py script path.")
+    p_doctor.add_argument("--dbcan-db", help="Optional dbCAN database directory to check.")
+    p_doctor.set_defaults(func=doctor)
     return parser
 
 

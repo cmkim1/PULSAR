@@ -27,6 +27,38 @@ Key interpretation rules:
   reports them as an unresolved equivalent core-opener group.
 - If one of GH16/GH86/GH118 is present outside strict PULs but absent from the
   GH117-centered strict PUL, that family is reported as a split-locus candidate.
+- If agarase-family genes are detected genome-wide but no strict CGC/PUL or
+  broad colocalized locus is detected, PULSAR reports
+  `genome_wide_agarase_without_locus_context` and does not recommend a GH
+  addition from PUL architecture alone.
+
+## How PULSAR Works
+
+PULSAR runs the analysis in four layers:
+
+1. Annotation layer
+   - For nucleotide FASTA input, Prodigal predicts proteins and GFF coordinates.
+   - dbCAN/CGCFinder annotates CAZyme, transporter, TF, STP, and CGC context.
+
+2. Feature layer
+   - `cgc.out` defines strict CGC/PUL-localized agarase-family counts.
+   - `hmmer.out` and `diamond.out` define genome-wide agarase-family counts.
+   - If `cgc.out` is empty but `cgc.gff` and DIAMOND/HMMER hits are available,
+     PULSAR reconstructs a broad colocalized locus from gene order.
+
+3. Context layer
+   - Strict CGC/PUL context is preferred.
+   - Broad colocalized locus context is used only when strict CGC/PUL context is
+     absent.
+   - Genome-wide hits without locus context are reported but not used to make a
+     PUL-based GH recommendation.
+
+4. Scoring layer
+   - GH117-positive context is treated as the central agar-PUL context.
+   - GH16/GH86/GH118 are neutral core-openers unless architecture points to a
+     specific split-locus or missing-context pattern.
+   - GH2 is considered only as local auxiliary context, not as a stand-alone
+     agar-PUL marker.
 
 ## Installation
 
@@ -54,6 +86,12 @@ Check commands:
 prodigal -v
 run_dbcan --help
 pulsar --help
+```
+
+Or run PULSAR's environment check:
+
+```bash
+pulsar doctor --dbcan-db dbcan_db
 ```
 
 Prepare the dbCAN database once, or let `run-genome` do this automatically
@@ -127,6 +165,14 @@ pulsar run-genome \
   --skip-dbcan-setup
 ```
 
+Check a legacy installation before running:
+
+```bash
+pulsar doctor \
+  --run-dbcan-script /path/to/run_dbcan.py \
+  --dbcan-db /path/to/dbcan_db
+```
+
 External programs required for this command:
 
 - `prodigal` for nucleotide genome input
@@ -184,6 +230,42 @@ genome  taxname
 GenomeA Example_species_A
 GenomeB Example_species_B
 ```
+
+For one existing dbCAN output directory:
+
+```bash
+pulsar score-dbcan \
+  --dbcan-dir output/GenomeA/dbcan \
+  --genome-id GenomeA \
+  --taxname "Example species A" \
+  --features-output output/GenomeA/features.tsv \
+  --output output/GenomeA/predictions.tsv \
+  --print-summary
+```
+
+## New Server Quickstart
+
+```bash
+git clone https://github.com/cmkim1/PULSAR.git
+cd PULSAR
+mamba env create -f environment.yml
+mamba activate pulsar
+
+pulsar doctor
+pulsar setup-dbcan --db-dir dbcan_db --min-free-gb 20
+pulsar doctor --dbcan-db dbcan_db
+
+pulsar run-genome \
+  --genome /path/to/genome.fna \
+  --out-dir output/GenomeA \
+  --dbcan-db dbcan_db \
+  --genome-id GenomeA \
+  --taxname "Example species A" \
+  --cpus 8
+```
+
+If the repository is private, clone with SSH or a GitHub token and make sure the
+server account has access.
 
 ## Required Feature Table Columns
 

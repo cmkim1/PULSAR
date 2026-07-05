@@ -156,7 +156,7 @@ def score_row(row: pd.Series) -> dict[str, Any]:
         aux_status = "auxiliary_missing_GH117"
         _add(scores, reasons, "GH117", 3.0, f"auxiliary GH96/GH2 context lacks GH117 in {context_label}")
     elif strict["GH117"] > 0:
-        aux_status = f"auxiliary_openers_outside_{context_label.replace(' ', '_')}"
+        aux_status = "auxiliary_not_detected_in_context"
     else:
         aux_status = "not_detected"
 

@@ -11,7 +11,7 @@ import pandas as pd
 from .model import FAMILIES
 
 
-FAMILY_RE = re.compile(r"\b(GH(?:2|16|50|86|96|117|118))(?:[_|;,\s]|$)")
+FAMILY_RE = re.compile(r"\b(GH(?:2|16|50|86|96|117|118))(?![0-9])")
 ID_RE = re.compile(r"(?:^|;)ID=([^;]+)")
 
 
@@ -81,6 +81,42 @@ def _diamond_gene_families(path: Path) -> dict[str, set[str]]:
     return gene_families
 
 
+def _modern_tsv_gene_families(path: Path) -> dict[str, set[str]]:
+    gene_families: dict[str, set[str]] = defaultdict(set)
+    if not path.exists() or path.stat().st_size == 0:
+        return gene_families
+
+    with path.open() as handle:
+        header = next(handle, "").rstrip("\n").split("\t")
+        normalized = [item.strip().lower().replace("_", " ") for item in header]
+        gene_columns = [
+            index
+            for index, name in enumerate(normalized)
+            if name in {"gene id", "protein id", "query id", "query name", "sequence id"}
+            or ("gene" in name and "cluster" not in name)
+            or ("protein" in name and "family" not in name)
+            or name == "query"
+        ]
+
+        for line in handle:
+            parts = line.rstrip("\n").split("\t")
+            families = extract_families(line)
+            if not families:
+                continue
+
+            candidates = [parts[index] for index in gene_columns if index < len(parts)]
+            if not candidates and parts:
+                if extract_families(parts[0]) and len(parts) > 2:
+                    candidates = [parts[2]]
+                else:
+                    candidates = [parts[0]]
+            if not candidates:
+                continue
+
+            gene_families[_normalize_gene_id(candidates[0])].update(families)
+    return gene_families
+
+
 def _count_cgc_families(path: Path) -> tuple[int, Counter[str]]:
     if not path.exists() or path.stat().st_size == 0:
         return 0, Counter()
@@ -88,13 +124,39 @@ def _count_cgc_families(path: Path) -> tuple[int, Counter[str]]:
     loci: dict[str, Counter[str]] = defaultdict(Counter)
     seen = set()
     with path.open() as handle:
-        for line in handle:
+        first = next(handle, "")
+        header = first.rstrip("\n").split("\t")
+        normalized = [item.strip().lower().replace("_", " ") for item in header]
+        has_header = any(
+            name in {"cgc", "cgc#", "cgc id", "gene id", "protein id", "gene type", "protein family"}
+            or name.startswith("cgc ")
+            for name in normalized
+        )
+
+        cgc_column = 4
+        gene_column = 8
+        if has_header:
+            for index, name in enumerate(normalized):
+                if "cgc" in name and ("id" in name or name in {"cgc", "cgc#"}) and "gene" not in name:
+                    cgc_column = index
+                    break
+            for index, name in enumerate(normalized):
+                if name in {"gene id", "protein id", "query id", "sequence id"} or (
+                    ("gene" in name or "protein" in name) and "type" not in name and "family" not in name
+                ):
+                    gene_column = index
+                    break
+            lines = handle
+        else:
+            lines = [first, *handle]
+
+        for line in lines:
             parts = line.rstrip("\n").split("\t")
-            if len(parts) < 11:
+            if len(parts) <= max(cgc_column, gene_column):
                 continue
-            cgc_id = parts[4]
-            gene_id = parts[8]
-            families = extract_families("\t".join(parts[10:]))
+            cgc_id = parts[cgc_column]
+            gene_id = parts[gene_column]
+            families = extract_families(line)
             for family in families:
                 key = (cgc_id, gene_id, family)
                 if key not in seen:
@@ -106,6 +168,13 @@ def _count_cgc_families(path: Path) -> tuple[int, Counter[str]]:
     for counts in agar_loci.values():
         total.update(counts)
     return len(agar_loci), total
+
+
+def _first_existing(paths: list[Path]) -> Path:
+    for path in paths:
+        if path.exists() and path.stat().st_size > 0:
+            return path
+    return paths[0]
 
 
 def _gff_gene_order(path: Path) -> list[tuple[str, str]]:
@@ -168,10 +237,21 @@ def _fallback_broad_loci(
 
 def features_from_dbcan_dir(dbcan_dir: Path, genome: str | None = None, taxname: str | None = None) -> dict[str, object]:
     genome_id = genome or dbcan_dir.name
-    cgc_loci, strict_counts = _count_cgc_families(dbcan_dir / "cgc.out")
+    cgc_loci, strict_counts = _count_cgc_families(
+        _first_existing(
+            [
+                dbcan_dir / "cgc.out",
+                dbcan_dir / "cgc_standard_out.tsv",
+                dbcan_dir / "total_cgc_info.tsv",
+            ]
+        )
+    )
     gene_families = _merge_gene_family_maps(
         _hmmer_gene_families(dbcan_dir / "hmmer.out"),
         _diamond_gene_families(dbcan_dir / "diamond.out"),
+        _modern_tsv_gene_families(dbcan_dir / "dbCAN_hmm_results.tsv"),
+        _modern_tsv_gene_families(dbcan_dir / "dbCANsub_hmm_results.tsv"),
+        _modern_tsv_gene_families(dbcan_dir / "overview.tsv"),
     )
     genome_counts = _count_gene_family_map(gene_families)
     fallback_loci, fallback_counts = _fallback_broad_loci(dbcan_dir / "cgc.gff", gene_families)

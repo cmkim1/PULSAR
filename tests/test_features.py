@@ -30,3 +30,37 @@ def test_features_use_diamond_and_gff_for_broad_locus(tmp_path: Path):
     assert row["broad_n_agar_loci"] == 1
     assert row["broad_locus_n_GH50"] == 1
     assert row["broad_locus_n_GH117"] == 1
+
+
+def test_features_read_modern_dbcan_easy_cgc_outputs(tmp_path: Path):
+    dbcan = tmp_path / "dbcan"
+    dbcan.mkdir()
+    (dbcan / "cgc_standard_out.tsv").write_text(
+        "CGC#\tGene Type\tContig ID\tProtein ID\tGene Start\tGene Stop\tDirection\tProtein Family\n"
+        "CGC1\tCAZyme\tctg\tctg_1\t1\t90\t+\tGH50.hmm\n"
+        "CGC1\tCAZyme\tctg\tctg_2\t91\t180\t+\tGH117_e1\n"
+        "CGC1\tCAZyme\tctg\tctg_3\t181\t270\t+\tGH2\n"
+    )
+    (dbcan / "dbCAN_hmm_results.tsv").write_text(
+        "HMM Profile\tProfile Length\tGene ID\tGene Length\tE Value\n"
+        "GH50.hmm\t300\tctg_1\t350\t1e-50\n"
+        "GH117.hmm\t400\tctg_2\t420\t1e-60\n"
+    )
+    (dbcan / "overview.tsv").write_text(
+        "Gene ID\tHMMER\tdbCAN_sub\tDIAMOND\n"
+        "ctg_3\tGH2.hmm\t-\t-\n"
+    )
+    (dbcan / "cgc.gff").write_text(
+        "ctg\tProdigal\tCDS\t1\t90\t.\t+\t0\tID=ctg_1\n"
+        "ctg\tProdigal\tCDS\t91\t180\t.\t+\t0\tID=ctg_2\n"
+        "ctg\tProdigal\tCDS\t181\t270\t.\t+\t0\tID=ctg_3\n"
+    )
+
+    row = features_from_dbcan_dir(dbcan, genome="modern")
+
+    assert row["strict_n_agar_loci"] == 1
+    assert row["broad_n_agar_loci"] == 1
+    assert row["strict_n_GH50"] == 1
+    assert row["strict_n_GH117"] == 1
+    assert row["strict_n_GH2"] == 1
+    assert row["genome_n_GH2"] == 1

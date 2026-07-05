@@ -1,13 +1,11 @@
 # PULSAR
 
 PULSAR (PUL-based Selection of AgaRase) is a small command-line tool for
-architecture-based scoring of agarolytic PULs and candidate GH family additions.
+architecture-based scoring of agarolytic PULs and candidate GH family additions
+that can enhance fitness.
 
-The model is intentionally rule-based and interpretable. It uses the local PUL
-architecture around agarolytic pathway genes rather than experimental outcomes.
-In particular, GH16, GH86, and GH118 are treated as neutral core-opener
-candidates unless the genome architecture itself supports one family over
-another.
+The model is rule-based and interpretable. It uses the local PUL
+architecture around agarolytic pathway genes.
 
 ## Model Concept
 
@@ -19,14 +17,7 @@ The score is based on two partially overlapping agarolytic pathways:
 Key interpretation rules:
 
 - A strict agar-PUL containing GH117 is treated as a central PUL context.
-- GH2 is kept as a local strict-PUL auxiliary context, not as a stand-alone
-  agar-PUL marker.
-- Non-strict GH2 signals are not used to drive recommendation scores.
-- GH16, GH86, and GH118 are not ranked by fixed family preference.
-- If GH16/GH86/GH118 are all absent from a GH50/GH117 core context, the model
-  reports them as an unresolved equivalent core-opener group.
-- If one of GH16/GH86/GH118 is present outside strict PULs but absent from the
-  GH117-centered strict PUL, that family is reported as a split-locus candidate.
+- GH2 outside the strict agar-PUL are not used to drive recommendation scores.
 - If agarase-family genes are detected genome-wide but no strict CGC/PUL or
   broad colocalized locus is detected, PULSAR reports
   `genome_wide_agarase_without_locus_context` and does not recommend a GH
@@ -54,15 +45,14 @@ PULSAR runs the analysis in four layers:
      PUL-based GH recommendation.
 
 4. Scoring layer
-   - GH117-positive context is treated as the central agar-PUL context.
-   - GH16/GH86/GH118 are neutral core-openers unless architecture points to a
-     specific split-locus or missing-context pattern.
-   - GH2 is considered only as local auxiliary context, not as a stand-alone
-     agar-PUL marker.
+   For each family g ∈ F = {GH2,GH16,GH50,GH86,GH96,GH117,GH118}, PULSAR calculates three types of counts:
+   - The number of g genes located within strict PULs detected by CGCFinder.
+   - The number of g genes located within broad loci reconstructed based on gene positions when no strict PUL is detected.
+   - The total number of g genes detected across the entire genome.
 
 ## Installation
 
-Install the external annotation tools first. With conda/mamba:
+Install the external annotation tools first. With mamba (or conda):
 
 ```bash
 git clone https://github.com/YOUR_USER/PULSAR.git

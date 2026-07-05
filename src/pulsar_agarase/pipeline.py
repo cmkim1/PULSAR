@@ -13,6 +13,10 @@ from .features import features_from_dbcan_dir
 from .model import score_dataframe
 
 
+LEGACY_DBCAN_MARKERS = ["dbCAN-HMMdb-V12.txt", "dbCAN-HMMdb-V11.txt", "dbCAN-HMMdb-V10.txt", "dbCAN-HMMdb-V9.txt"]
+MODERN_DBCAN_MARKERS = ["CAZy.dmnd", "dbCAN.hmm", "dbCAN-sub.hmm", "TCDB.dmnd", "TF.hmm", "STP.hmm"]
+
+
 def require_executable(name: str) -> str:
     path = shutil.which(name)
     if path is None:
@@ -71,8 +75,7 @@ def setup_dbcan_database(
             f"{min_free_gb:.1f} GB required. Use --min-free-gb to change this threshold."
         )
 
-    marker_files = ["dbCAN-HMMdb-V12.txt", "dbCAN-HMMdb-V11.txt", "dbCAN-HMMdb-V10.txt", "dbCAN-HMMdb-V9.txt"]
-    if not force and any((db_dir / marker).exists() for marker in marker_files):
+    if not force and dbcan_database_present(db_dir):
         return db_dir
 
     log = db_dir / "setup_dbcan.log"
@@ -82,8 +85,10 @@ def setup_dbcan_database(
 
 
 def dbcan_database_present(db_dir: Path) -> bool:
-    marker_files = ["dbCAN-HMMdb-V12.txt", "dbCAN-HMMdb-V11.txt", "dbCAN-HMMdb-V10.txt", "dbCAN-HMMdb-V9.txt"]
-    return any((db_dir / marker).exists() for marker in marker_files)
+    has_legacy = any((db_dir / marker).is_file() for marker in LEGACY_DBCAN_MARKERS)
+    has_modern = all((db_dir / marker).is_file() for marker in MODERN_DBCAN_MARKERS)
+    has_partial = any(db_dir.glob("*.part"))
+    return (has_legacy or has_modern) and not has_partial
 
 
 def detect_input_type(path: Path, requested: str) -> str:

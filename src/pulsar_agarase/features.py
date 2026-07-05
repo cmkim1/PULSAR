@@ -13,6 +13,7 @@ from .model import FAMILIES
 
 FAMILY_RE = re.compile(r"\b(GH(?:2|16|50|86|96|117|118))(?![0-9])")
 ID_RE = re.compile(r"(?:^|;)ID=([^;]+)")
+ORDERED_ID_RE = re.compile(r"(.+)_([0-9]+)$")
 
 
 def extract_families(text: str) -> set[str]:
@@ -235,6 +236,54 @@ def _fallback_broad_loci(
     return len(agar_loci), counts
 
 
+def _gene_id_order(gene_id: str) -> tuple[str, int] | None:
+    match = ORDERED_ID_RE.match(gene_id)
+    if not match:
+        return None
+    return match.group(1), int(match.group(2))
+
+
+def _fallback_broad_loci_from_gene_ids(
+    gene_families: dict[str, set[str]],
+    max_gap: int = 10,
+) -> tuple[int, Counter[str]]:
+    marker_positions = []
+    for gene_id in gene_families:
+        parsed = _gene_id_order(gene_id)
+        if parsed is None:
+            continue
+        contig, index = parsed
+        marker_positions.append((contig, index, gene_id))
+
+    if not marker_positions:
+        return 0, Counter()
+
+    marker_positions.sort()
+    loci: list[list[str]] = []
+    current = [marker_positions[0][2]]
+    prev_contig, prev_index, _ = marker_positions[0]
+    for contig, index, gene_id in marker_positions[1:]:
+        if contig == prev_contig and index - prev_index <= max_gap:
+            current.append(gene_id)
+        else:
+            loci.append(current)
+            current = [gene_id]
+        prev_contig, prev_index = contig, index
+    loci.append(current)
+
+    agar_loci = [locus for locus in loci if len(locus) >= 2]
+    counts: Counter[str] = Counter()
+    for locus in agar_loci:
+        seen = set()
+        for gene_id in locus:
+            for family in gene_families.get(gene_id, set()):
+                key = (gene_id, family)
+                if key not in seen:
+                    counts[family] += 1
+                    seen.add(key)
+    return len(agar_loci), counts
+
+
 def features_from_dbcan_dir(dbcan_dir: Path, genome: str | None = None, taxname: str | None = None) -> dict[str, object]:
     genome_id = genome or dbcan_dir.name
     cgc_loci, strict_counts = _count_cgc_families(
@@ -255,6 +304,8 @@ def features_from_dbcan_dir(dbcan_dir: Path, genome: str | None = None, taxname:
     )
     genome_counts = _count_gene_family_map(gene_families)
     fallback_loci, fallback_counts = _fallback_broad_loci(dbcan_dir / "cgc.gff", gene_families)
+    if fallback_loci == 0:
+        fallback_loci, fallback_counts = _fallback_broad_loci_from_gene_ids(gene_families)
     broad_loci = max(cgc_loci, fallback_loci)
 
     has_genome_wide = int(bool(genome_counts))

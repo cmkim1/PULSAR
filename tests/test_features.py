@@ -64,3 +64,25 @@ def test_features_read_modern_dbcan_easy_cgc_outputs(tmp_path: Path):
     assert row["strict_n_GH117"] == 1
     assert row["strict_n_GH2"] == 1
     assert row["genome_n_GH2"] == 1
+
+
+def test_features_infer_broad_locus_from_ordered_gene_ids_without_cgc_gff(tmp_path: Path):
+    dbcan = tmp_path / "dbcan"
+    dbcan.mkdir()
+    (dbcan / "cgc_standard_out.tsv").write_text(
+        "CGC#\tGene Type\tContig ID\tProtein ID\tGene Start\tGene Stop\tGene Strand\tGene Annotation\n"
+    )
+    (dbcan / "overview.tsv").write_text(
+        "Gene ID\tEC#\tdbCAN_hmm\tdbCAN_sub\tDIAMOND\t#ofTools\tRecommend Results\tSubstrate\n"
+        "NC_016613.1_100\t-\t-\t-\tGH50\t1\t-\t-\n"
+        "NC_016613.1_104\t-\t-\t-\tGH117\t1\t-\t-\n"
+        "NC_016613.1_109\t-\t-\t-\tGH2\t1\t-\t-\n"
+    )
+
+    row = features_from_dbcan_dir(dbcan, genome="ordered")
+
+    assert row["strict_n_agar_loci"] == 0
+    assert row["broad_n_agar_loci"] == 1
+    assert row["broad_locus_n_GH50"] == 1
+    assert row["broad_locus_n_GH117"] == 1
+    assert row["broad_locus_n_GH2"] == 1

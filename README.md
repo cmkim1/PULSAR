@@ -237,30 +237,6 @@ pulsar score-dbcan \
   --print-summary
 ```
 
-## New Server Quickstart
-
-```bash
-git clone https://github.com/cmkim1/PULSAR.git
-cd PULSAR
-mamba env create -f environment.yml
-mamba activate pulsar
-
-pulsar doctor
-pulsar setup-dbcan --db-dir dbcan_db --min-free-gb 20
-pulsar doctor --dbcan-db dbcan_db
-
-pulsar run-genome \
-  --genome /path/to/genome.fna \
-  --out-dir output/GenomeA \
-  --dbcan-db dbcan_db \
-  --genome-id GenomeA \
-  --taxname "Example species A" \
-  --cpus 8
-```
-
-If the repository is private, clone with SSH or a GitHub token and make sure the
-server account has access.
-
 ## Required Feature Table Columns
 
 For each genome, the scoring command expects:
@@ -288,12 +264,3 @@ The output appends:
 - `core_pathway_status`
 - `auxiliary_pathway_status`
 - `core_opener_status`
-
-## Important Notes
-
-This is a hypothesis-generation model, not a validated classifier of growth
-phenotype. The score should be used to prioritize GH families or PUL
-architectures for follow-up analysis.
-
-For publication-scale use, report the exact version, input feature table, and
-the rule descriptions in this README.

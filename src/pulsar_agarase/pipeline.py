@@ -144,9 +144,62 @@ def sanitize_gff_for_dbcan(gff: Path, destination: Path) -> Path:
 
 
 def dbcan_tools_args(tools: str, legacy_script: bool = False) -> list[str]:
-    if not legacy_script:
-        return [tools]
-    return [tool.strip() for tool in tools.replace(",", " ").split() if tool.strip()]
+    parsed = [tool.strip() for tool in tools.replace(",", " ").split() if tool.strip()]
+    if legacy_script:
+        return parsed
+
+    modern_names = {"hmmer": "hmm", "hmm": "hmm", "diamond": "diamond", "dbCANsub": "dbCANsub", "dbcansub": "dbCANsub"}
+    modern = [modern_names.get(tool, tool) for tool in parsed]
+    return [",".join(modern)]
+
+
+def build_modern_run_dbcan_command(
+    run_dbcan_exec: str,
+    faa: Path,
+    dbcan_out: Path,
+    db_dir: Path,
+    gff: Path | None,
+    tools: str,
+    cpus: int,
+) -> list[str]:
+    if gff is not None:
+        return [
+            run_dbcan_exec,
+            "easy_CGC",
+            "--mode",
+            "protein",
+            "--input_raw_data",
+            str(faa),
+            "--input_gff",
+            str(gff),
+            "--gff_type",
+            "prodigal",
+            "--output_dir",
+            str(dbcan_out),
+            "--db_dir",
+            str(db_dir),
+            "--methods",
+            *dbcan_tools_args(tools, legacy_script=False),
+            "--threads",
+            str(cpus),
+        ]
+
+    return [
+        run_dbcan_exec,
+        "CAZyme_annotation",
+        "--mode",
+        "protein",
+        "--input_raw_data",
+        str(faa),
+        "--output_dir",
+        str(dbcan_out),
+        "--db_dir",
+        str(db_dir),
+        "--methods",
+        *dbcan_tools_args(tools, legacy_script=False),
+        "--threads",
+        str(cpus),
+    ]
 
 
 def run_dbcan(
@@ -175,31 +228,39 @@ def run_dbcan(
         run_dbcan_script = run_dbcan_script.resolve()
         command = [sys.executable, str(run_dbcan_script)]
         command_cwd = run_dbcan_script.parent
+        command.extend(
+            [
+                str(faa),
+                "protein",
+                "--out_dir",
+                str(dbcan_out),
+                "--db_dir",
+                str(db_dir),
+                "--tools",
+            ]
+            + dbcan_tools_args(tools, legacy_script=True)
+            + [
+                "--hmm_cpu",
+                str(cpus),
+                "--dia_cpu",
+                str(cpus),
+            ]
+        )
+        if dbcan_file:
+            command.extend(["--dbCANFile", dbcan_file])
+        if gff is not None:
+            command.extend(["--cluster", str(gff)])
     else:
         run_dbcan_exec = require_executable(run_dbcan_bin)
-        command = [run_dbcan_exec]
-    command.extend(
-        [
-            str(faa),
-            "protein",
-            "--out_dir",
-            str(dbcan_out),
-            "--db_dir",
-            str(db_dir),
-            "--tools",
-        ]
-        + dbcan_tools_args(tools, legacy_script=run_dbcan_script is not None)
-        + [
-            "--hmm_cpu",
-            str(cpus),
-            "--dia_cpu",
-            str(cpus),
-        ]
-    )
-    if dbcan_file:
-        command.extend(["--dbCANFile", dbcan_file])
-    if gff is not None:
-        command.extend(["--cluster", str(gff)])
+        command = build_modern_run_dbcan_command(
+            run_dbcan_exec=run_dbcan_exec,
+            faa=faa,
+            dbcan_out=dbcan_out,
+            db_dir=db_dir,
+            gff=gff,
+            tools=tools,
+            cpus=cpus,
+        )
     allow_outputs = [dbcan_out / "cgc.out", dbcan_out / "cgc.gff"] if gff is not None else [dbcan_out / "hmmer.out", dbcan_out / "diamond.out"]
     run_command(command, log, allow_outputs=allow_outputs, cwd=command_cwd, label="dbCAN/CGCFinder")
     return dbcan_out

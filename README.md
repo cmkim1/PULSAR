@@ -119,6 +119,10 @@ run_dbcan database --db_dir dbcan_db
 
 Use `--skip-dbcan-setup` to disable automatic database setup.
 
+With the current `run_dbcan` CLI, PULSAR calls `run_dbcan easy_CGC` for
+genome/GFF-aware runs. Older single-script installations can still be used with
+`--run-dbcan-script`.
+
 Main outputs:
 
 ```text

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from .features import features_from_dbcan_dir, features_from_dbcan_root
+from .features import dbcan_feature_tables, features_from_dbcan_dir, features_from_dbcan_root
 from .model import score_dataframe
 from .pipeline import dbcan_database_present, score_genome, setup_dbcan_database
 
@@ -33,11 +33,28 @@ def features_from_dbcan(args: argparse.Namespace) -> None:
 
 
 def score_dbcan(args: argparse.Namespace) -> None:
-    row = features_from_dbcan_dir(Path(args.dbcan_dir), genome=args.genome_id, taxname=args.taxname)
+    windows = [int(value) for value in args.scan_windows.split(",")] if args.scan_windows else None
+    row, marker_table, candidate_windows, scan_puls = dbcan_feature_tables(
+        Path(args.dbcan_dir),
+        genome=args.genome_id,
+        taxname=args.taxname,
+        gff_path=Path(args.gff) if args.gff else None,
+        scan_windows=windows,
+        scan_permutations=args.scan_permutations,
+        scan_seed=args.scan_seed,
+        scan_alpha=args.scan_alpha,
+        scan_unit=args.scan_unit,
+    )
     features = pd.DataFrame([row])
     scored = score_dataframe(features)
     if args.features_output:
         features.to_csv(args.features_output, sep="\t", index=False)
+    if args.marker_output:
+        marker_table.to_csv(args.marker_output, sep="\t", index=False)
+    if args.candidate_windows_output:
+        candidate_windows.to_csv(args.candidate_windows_output, sep="\t", index=False)
+    if args.pul_output:
+        scan_puls.to_csv(args.pul_output, sep="\t", index=False)
     scored.to_csv(args.output, sep="\t", index=False)
     if args.print_summary:
         print(scored.T.to_string())
@@ -60,6 +77,11 @@ def run_genome(args: argparse.Namespace) -> None:
         cpus=args.cpus,
         auto_setup_dbcan=not args.skip_dbcan_setup,
         min_free_gb=args.min_free_gb,
+        scan_permutations=args.scan_permutations,
+        scan_seed=args.scan_seed,
+        scan_alpha=args.scan_alpha,
+        scan_windows=[int(value) for value in args.scan_windows.split(",")] if args.scan_windows else None,
+        scan_unit=args.scan_unit,
     )
 
 
@@ -128,6 +150,15 @@ def build_parser() -> argparse.ArgumentParser:
     p_score_dbcan.add_argument("--dbcan-dir", required=True, help="Directory containing cgc.out/hmmer.out/diamond.out/cgc.gff for one genome.")
     p_score_dbcan.add_argument("-o", "--output", required=True, help="Output scored prediction TSV.")
     p_score_dbcan.add_argument("--features-output", help="Optional output feature TSV.")
+    p_score_dbcan.add_argument("--marker-output", help="Optional output marker-gene TSV.")
+    p_score_dbcan.add_argument("--candidate-windows-output", help="Optional output scan candidate-window TSV.")
+    p_score_dbcan.add_argument("--pul-output", help="Optional output scan-detected agar-PUL TSV.")
+    p_score_dbcan.add_argument("--gff", help="Optional GFF used for gene order/coordinates in scan-based PUL detection.")
+    p_score_dbcan.add_argument("--scan-windows", help="Comma-separated window sizes in the selected scan unit. Defaults: gene=5,10,15,20,30,50; bp=5000,10000,20000,50000,100000.")
+    p_score_dbcan.add_argument("--scan-unit", choices=["gene", "bp"], default="gene", help="Scan window unit. Default: gene.")
+    p_score_dbcan.add_argument("--scan-permutations", type=int, default=999, help="Monte Carlo permutations for scan detection. Default: 999.")
+    p_score_dbcan.add_argument("--scan-seed", type=int, default=1, help="Random seed for scan detection. Default: 1.")
+    p_score_dbcan.add_argument("--scan-alpha", type=float, default=0.05, help="Empirical p-value threshold for scan-detected PULs. Default: 0.05.")
     p_score_dbcan.add_argument("--genome-id", help="Genome ID to write in the output table.")
     p_score_dbcan.add_argument("--taxname", help="Taxon/strain name to write in the output table.")
     p_score_dbcan.add_argument("--print-summary", action="store_true", help="Print the scored row transposed to stdout.")
@@ -156,6 +187,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_run.add_argument("--cpus", type=int, default=4, help="CPU threads for HMMER/DIAMOND. Default: 4.")
     p_run.add_argument("--min-free-gb", type=float, default=20.0, help="Minimum free disk space before automatic dbCAN setup. Default: 20.")
     p_run.add_argument("--skip-dbcan-setup", action="store_true", help="Do not automatically run run_dbcan database if --dbcan-db is missing.")
+    p_run.add_argument("--scan-windows", help="Comma-separated window sizes in the selected scan unit. Defaults: gene=5,10,15,20,30,50; bp=5000,10000,20000,50000,100000.")
+    p_run.add_argument("--scan-unit", choices=["gene", "bp"], default="gene", help="Scan window unit. Default: gene.")
+    p_run.add_argument("--scan-permutations", type=int, default=999, help="Monte Carlo permutations for scan detection. Default: 999.")
+    p_run.add_argument("--scan-seed", type=int, default=1, help="Random seed for scan detection. Default: 1.")
+    p_run.add_argument("--scan-alpha", type=float, default=0.05, help="Empirical p-value threshold for scan-detected PULs. Default: 0.05.")
     p_run.set_defaults(func=run_genome)
 
     p_doctor = sub.add_parser("doctor", help="Check whether required external tools and optional dbCAN database are available.")

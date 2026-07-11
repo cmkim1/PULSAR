@@ -4,8 +4,9 @@ PULSAR (PUL-based Selection of AgaRase) is a small command-line tool for
 architecture-based scoring of agarolytic PULs and candidate GH family additions
 that can enhance fitness.
 
-The model is rule-based and interpretable. It uses the local PUL
-architecture around agarolytic pathway genes.
+The model is rule-based and interpretable. PULSAR detects agar-PUL candidates
+from the genome-wide distribution of agar-related marker genes, then scores
+candidate GH family additions from the detected locus architecture.
 
 ## Model Concept
 
@@ -16,10 +17,17 @@ The score is based on two partially overlapping agarolytic pathways:
 
 Key interpretation rules:
 
-- A strict agar-PUL containing GH117 is treated as a central PUL context.
-- GH2 outside the strict agar-PUL are not used to drive recommendation scores.
-- If agarase-family genes are detected genome-wide but no strict CGC/PUL or
-  broad colocalized locus is detected, PULSAR reports
+- Agar-PUL detection is not gated by CGCFinder. CGCFinder output is kept as a
+  strict comparison layer, but the default detector uses a multiscale scan over
+  marker-gene positions.
+- The default scan uses gene-count windows. Base-pair windows are available with
+  `--scan-unit bp`.
+- Scan detection counts agarase and L-AHG metabolism marker genes together.
+  Pathway-combination logic is applied only after candidate PULs are detected.
+- GH2 is not a stand-alone agar-PUL detection marker. If GH2 falls inside a
+  detected agar-PUL, it is reported as an auxiliary/supporting feature.
+- If agarase-family genes are detected genome-wide but no statistically
+  supported marker-gene cluster is detected, PULSAR reports
   `genome_wide_agarase_without_locus_context` and does not recommend a GH
   addition from PUL architecture alone.
 
@@ -32,15 +40,22 @@ PULSAR runs the analysis in four layers:
    - dbCAN/CGCFinder annotates CAZyme, transporter, TF, STP, and CGC context.
 
 2. Feature layer
-   - `cgc.out` defines strict CGC/PUL-localized agarase-family counts.
-   - `hmmer.out` and `diamond.out` define genome-wide agarase-family counts.
-   - If `cgc.out` is empty but `cgc.gff` and DIAMOND/HMMER hits are available,
-     PULSAR reconstructs a broad colocalized locus from gene order.
+   - dbCAN outputs define genome-wide marker genes.
+   - PULSAR builds a marker table with gene order/coordinates where available.
+   - Detection markers include agarolytic GH16 subtypes, GH50, GH86, GH96,
+     GH117, GH118, and L-AHG metabolism genes detected from GFF annotations.
+   - GH2 is retained only as an auxiliary/supporting marker inside detected
+     PULs.
 
 3. Context layer
-   - Strict CGC/PUL context is preferred.
-   - Broad colocalized locus context is used only when strict CGC/PUL context is
-     absent.
+   - PULSAR scans multiple gene-count window sizes across each contig.
+   - Windows are scored by marker-gene enrichment relative to genome-wide marker
+     density.
+   - Monte Carlo simulations randomly redistribute the same number of detection
+     marker genes and estimate empirical p-values for the top non-overlapping
+     intervals.
+   - Significant intervals are reported as scan-detected agar-PULs.
+   - Strict CGC/PUL context is still reported separately for comparison.
    - Genome-wide hits without locus context are reported but not used to make a
      PUL-based GH recommendation.
 
@@ -131,6 +146,9 @@ output/GenomeA/
   work/prodigal.gff
   dbcan/
   features.tsv
+  marker_genes.tsv
+  scan_candidate_windows.tsv
+  scan_agar_puls.tsv
   predictions.tsv
   logs/
 ```
@@ -233,8 +251,34 @@ pulsar score-dbcan \
   --genome-id GenomeA \
   --taxname "Example species A" \
   --features-output output/GenomeA/features.tsv \
+  --marker-output output/GenomeA/marker_genes.tsv \
+  --candidate-windows-output output/GenomeA/scan_candidate_windows.tsv \
+  --pul-output output/GenomeA/scan_agar_puls.tsv \
   --output output/GenomeA/predictions.tsv \
   --print-summary
+```
+
+Useful scan options:
+
+```bash
+pulsar score-dbcan \
+  --dbcan-dir output/GenomeA/dbcan \
+  --gff output/GenomeA/work/prodigal.gff \
+  --scan-unit gene \
+  --scan-windows 5,10,15,20,30,50 \
+  --scan-permutations 999 \
+  --output output/GenomeA/predictions.tsv
+```
+
+For base-pair windows:
+
+```bash
+pulsar score-dbcan \
+  --dbcan-dir output/GenomeA/dbcan \
+  --gff output/GenomeA/work/prodigal.gff \
+  --scan-unit bp \
+  --scan-windows 5000,10000,20000,50000 \
+  --output output/GenomeA/predictions.tsv
 ```
 
 ## Required Feature Table Columns

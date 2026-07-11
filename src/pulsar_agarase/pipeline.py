@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from .features import features_from_dbcan_dir
+from .features import dbcan_feature_tables
 from .model import score_dataframe
 
 
@@ -282,6 +282,11 @@ def score_genome(
     cpus: int = 4,
     auto_setup_dbcan: bool = True,
     min_free_gb: float = 20.0,
+    scan_windows: list[int] | None = None,
+    scan_permutations: int = 999,
+    scan_seed: int = 1,
+    scan_alpha: float = 0.05,
+    scan_unit: str = "gene",
 ) -> pd.DataFrame:
     out_dir.mkdir(parents=True, exist_ok=True)
     work_dir = out_dir / "work"
@@ -317,10 +322,23 @@ def score_genome(
         dbcan_file=dbcan_file,
         cpus=cpus,
     )
-    row = features_from_dbcan_dir(dbcan_out, genome=genome_id or genome.stem, taxname=taxname or genome_id or genome.stem)
+    row, marker_table, candidate_windows, scan_puls = dbcan_feature_tables(
+        dbcan_out,
+        genome=genome_id or genome.stem,
+        taxname=taxname or genome_id or genome.stem,
+        gff_path=cluster_gff,
+        scan_windows=scan_windows,
+        scan_permutations=scan_permutations,
+        scan_seed=scan_seed,
+        scan_alpha=scan_alpha,
+        scan_unit=scan_unit,
+    )
     features = pd.DataFrame([row])
     scored = score_dataframe(features)
     features.to_csv(out_dir / "features.tsv", sep="\t", index=False)
+    marker_table.to_csv(out_dir / "marker_genes.tsv", sep="\t", index=False)
+    candidate_windows.to_csv(out_dir / "scan_candidate_windows.tsv", sep="\t", index=False)
+    scan_puls.to_csv(out_dir / "scan_agar_puls.tsv", sep="\t", index=False)
     scored.to_csv(out_dir / "predictions.tsv", sep="\t", index=False)
     print(f"PULSAR: wrote {out_dir / 'predictions.tsv'}", flush=True)
     return scored

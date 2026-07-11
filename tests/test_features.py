@@ -10,18 +10,16 @@ def test_features_use_diamond_and_gff_for_broad_locus(tmp_path: Path):
     (dbcan / "cgc.out").write_text("")
     (dbcan / "diamond.out").write_text(
         "Gene ID\tCAZy ID\t% Identical\n"
-        "1_1\tAAA|GH50|\t90\n"
-        "1_5\tBBB|GH117|\t85\n"
+        "1_50\tAAA|GH50|\t90\n"
+        "1_52\tBBB|GH117|\t85\n"
+        "1_53\tCCC|GH86|\t80\n"
     )
-    (dbcan / "cgc.gff").write_text(
-        "ctg\tProdigal\tCDS\t1\t90\t.\t+\t0\tID=1_1\n"
-        "ctg\tProdigal\tCDS\t91\t180\t.\t+\t0\tID=1_2\n"
-        "ctg\tProdigal\tCDS\t181\t270\t.\t+\t0\tID=1_3\n"
-        "ctg\tProdigal\tCDS\t271\t360\t.\t+\t0\tID=1_4\n"
-        "ctg\tProdigal\tCDS\t361\t450\t.\t+\t0\tID=1_5\n"
-    )
+    gff_lines = []
+    for index in range(1, 501):
+        gff_lines.append(f"ctg\tProdigal\tCDS\t{index * 100}\t{index * 100 + 89}\t.\t+\t0\tID=1_{index}\n")
+    (dbcan / "cgc.gff").write_text("".join(gff_lines))
 
-    row = features_from_dbcan_dir(dbcan, genome="g1")
+    row = features_from_dbcan_dir(dbcan, genome="g1", scan_permutations=99)
 
     assert row["has_genome_wide_annotation"] == 1
     assert row["genome_n_GH50"] == 1
@@ -29,6 +27,7 @@ def test_features_use_diamond_and_gff_for_broad_locus(tmp_path: Path):
     assert row["strict_n_agar_loci"] == 0
     assert row["broad_n_agar_loci"] == 1
     assert row["broad_locus_n_GH50"] == 1
+    assert row["broad_locus_n_GH86"] == 1
     assert row["broad_locus_n_GH117"] == 1
 
 
@@ -75,14 +74,17 @@ def test_features_infer_broad_locus_from_ordered_gene_ids_without_cgc_gff(tmp_pa
     (dbcan / "overview.tsv").write_text(
         "Gene ID\tEC#\tdbCAN_hmm\tdbCAN_sub\tDIAMOND\t#ofTools\tRecommend Results\tSubstrate\n"
         "NC_016613.1_100\t-\t-\t-\tGH50\t1\t-\t-\n"
-        "NC_016613.1_104\t-\t-\t-\tGH117\t1\t-\t-\n"
-        "NC_016613.1_109\t-\t-\t-\tGH2\t1\t-\t-\n"
+        "NC_016613.1_101\t-\t-\t-\tGH117\t1\t-\t-\n"
+        "NC_016613.1_102\t-\t-\t-\tGH2\t1\t-\t-\n"
+        "NC_016613.1_103\t-\t-\t-\tGH86\t1\t-\t-\n"
+        "NC_016613.1_1000\t-\t-\t-\tGH2\t1\t-\t-\n"
     )
 
-    row = features_from_dbcan_dir(dbcan, genome="ordered")
+    row = features_from_dbcan_dir(dbcan, genome="ordered", scan_permutations=99)
 
     assert row["strict_n_agar_loci"] == 0
     assert row["broad_n_agar_loci"] == 1
     assert row["broad_locus_n_GH50"] == 1
+    assert row["broad_locus_n_GH86"] == 1
     assert row["broad_locus_n_GH117"] == 1
     assert row["broad_locus_n_GH2"] == 1

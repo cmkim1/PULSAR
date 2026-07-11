@@ -217,12 +217,7 @@ def _gff_gene_records(path: Path | None) -> tuple[dict[str, dict[str, object]], 
             parts = line.rstrip("\n").split("\t")
             if len(parts) < 9:
                 continue
-            feature_type = parts[2].lower()
-            if feature_type not in {"cds", "gene"}:
-                continue
             contig = parts[0]
-            contig_lengths[contig] += 1
-            gene_index = contig_lengths[contig]
             attrs = _gff_attributes(parts[8])
             ids = [
                 attrs.get("ID", ""),
@@ -230,6 +225,11 @@ def _gff_gene_records(path: Path | None) -> tuple[dict[str, dict[str, object]], 
                 attrs.get("protein_id", ""),
                 attrs.get("locus_tag", ""),
             ]
+            feature_type = parts[2].lower()
+            if feature_type not in {"cds", "gene"} and not any(ids):
+                continue
+            contig_lengths[contig] += 1
+            gene_index = contig_lengths[contig]
             product_text = " ".join([attrs.get("product", ""), attrs.get("Note", ""), parts[8]])
             if LAHG_RE.search(product_text):
                 for gene_id in ids:

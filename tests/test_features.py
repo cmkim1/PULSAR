@@ -31,6 +31,41 @@ def test_features_use_diamond_and_gff_for_broad_locus(tmp_path: Path):
     assert row["broad_locus_n_GH117"] == 1
 
 
+def test_features_use_dbcan_style_cgc_gff_rows_for_scan_detection(tmp_path: Path):
+    dbcan = tmp_path / "dbcan"
+    dbcan.mkdir()
+    (dbcan / "hmmer.out").write_text("header\n")
+    (dbcan / "cgc.out").write_text("")
+    (dbcan / "diamond.out").write_text(
+        "Gene ID\tCAZy ID\t% Identical\n"
+        "WP_50\tAAA|GH50|\t90\n"
+        "WP_52\tBBB|GH117|\t85\n"
+        "WP_53\tCCC|GH86|\t80\n"
+        "WP_51\tDDD|GH2|\t75\n"
+    )
+
+    gff_lines = []
+    for index in range(1, 501):
+        gene_id = f"WP_{index}"
+        feature_type = "CAZyme" if index in {50, 51, 52, 53} else "null"
+        gff_lines.append(
+            f"ctg\tdbCAN\t{feature_type}\t{index * 100}\t{index * 100 + 89}\t.\t+\t.\tID={gene_id};DB=none\n"
+        )
+    (dbcan / "cgc.gff").write_text("".join(gff_lines))
+
+    row = features_from_dbcan_dir(dbcan, genome="dbcan-gff", scan_permutations=99)
+
+    assert row["has_genome_wide_annotation"] == 1
+    assert row["genome_n_GH50"] == 1
+    assert row["genome_n_GH86"] == 1
+    assert row["genome_n_GH117"] == 1
+    assert row["broad_n_agar_loci"] == 1
+    assert row["broad_locus_n_GH50"] == 1
+    assert row["broad_locus_n_GH86"] == 1
+    assert row["broad_locus_n_GH117"] == 1
+    assert row["broad_locus_n_GH2"] == 1
+
+
 def test_features_read_modern_dbcan_easy_cgc_outputs(tmp_path: Path):
     dbcan = tmp_path / "dbcan"
     dbcan.mkdir()
